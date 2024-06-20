@@ -1,0 +1,53 @@
+[project]
+name = "fast-jsonl"
+description = "A simple JSONL reader that caches line byte positions for fast loading."
+readme = "README.md"
+authors = [
+    {name = "Mathew Huerta-Enochian", email = "mathewhe@gmail.com"},
+]
+maintainers = [
+    {name = "Mathew Huerta-Enochian", email = "mathewhe@gmail.com"},
+]
+version = "0.1.0"
+requires-python = ">=3.8.0"
+dependencies = [
+    "filelock",
+]
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "black",
+    "sphinx",
+    "sphinx_copybutton",
+    "pydata_sphinx_theme",
+    "myst_parser",
+]
+
+[project.urls]
+repository = "https://github.com/mathewhuen/fast-jsonl"
+changelog = "https://github.com/mathewhuen/fast-jsonl/blob/main/CHANGELOG.md"
+
+[build-system]
+requires = ["setuptools >= 61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 79
+target-version = ["py312"]
