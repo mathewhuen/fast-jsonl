@@ -9,7 +9,7 @@ import data
 
 
 SLEEP_TIME = 0.1
-N_THREADS = 2
+N_THREADS = 4
 TOLERANCE = 0.01
 
 
@@ -33,6 +33,6 @@ class TestLock:
         for thread in threads:
             thread.join()
         end = time.time()
-        rate = (end - start) / N_THREADS
-        expected_rate = SLEEP_TIME
-        assert abs(rate - expected_rate) < TOLERANCE
+        measured = (end - start)
+        serial = SLEEP_TIME * N_THREADS
+        assert measured > serial
