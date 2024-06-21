@@ -15,8 +15,9 @@
 r"""
 Modules for working with the JSONL cache file.
 
-These files are not intended for users to call directly. Instead, users should
-initialize a :class:`fast_jsonl.Reader` class to work with files.
+These functions are not intended for users to call directly. Instead, users
+should initialize a :class:`fast_jsonl.reader.Reader` instance to work with
+files.
 """
 
 import os

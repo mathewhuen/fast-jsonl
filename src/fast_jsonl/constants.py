@@ -12,7 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+r"""
+Library-wide constants.
+
+Environment variable constants:
+
+* FAST_JSONL_DIR_METHOD: If set to "user", JSONL cache files will be saved to `<user-home>/.local/share/fj_cache/`\. If set to "local", JSONL cache files will be saved to `<file-directory>/.fj_cache/`\. Defaults to "user".
+
+"""
+
 import os
+
 
 DIR_METHOD_ENV = "FAST_JSONL_DIR_METHOD"
 DEFAULT_DIR_METHOD = "user"

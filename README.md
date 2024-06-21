@@ -1,9 +1,16 @@
-# Fast-JSONL
+# fast-jsonl
 
 A very simple library for reading large JSONL files.
 
-This library relies on a line-bit cache that must be calculated once per a
-file.
+This library uses a line-bit cache that must be calculated once per a file and
+can be used across threads and runtimes until the JSONL file is changed.
+
+## Why?
+
+fast-jsonl is intended mostly for data science and machine learning
+workflows where JSONL data is common and large dataset sizes make it
+impractical to load the entire dataset into memory (especially when using
+multiprocessing).
 
 ## Quickstart
 

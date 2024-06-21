@@ -12,6 +12,41 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+r"""
+:class:`Reader` is the recommended way to work with large JSONL files.
+This class records the byte location of each line in JSONL files on first load
+and then uses the location for quickly reading lines.
+
+This is helpful for files that are too large to be loaded into memory but need
+non-serial access. I.e., ideal for large JSONL files that should be read by
+index like in an ML training workflow.
+
+Use like:
+
+>>> import fast_jsonl as fj
+>>> reader = fj.Reader("path_to_file.jsonl")
+>>>
+>>> # Slice or index to get subsets:
+>>> range_of_values = reader[100:105]
+>>>
+>>> # Use with a PyTorch DataLoader:
+>>> from torch.utils.data import DataLoader
+>>> data = DataLoader(reader)
+
+If your workflow may lead to changes in the original data file, the cache will
+need to be re-generated. Include one of the following flags when initializing
+the reader to enforce this:
+
+* `force_cache=True`\: Always re-cache.
+* `check_cache_time=True`\: Re-cache if the file was modified after caching.
+* `check_cache_hash=True`\: Re-cache if the hash is different from the cached
+  hash.
+
+Note that currently, cache checks are only performed on initial load and JSONL
+data files should not be modified during runtime. We plan on adding continuous
+checks to catch data changes in the future.
+"""
+
 import os
 import json
 from typing import Optional, Union
@@ -84,7 +119,7 @@ class Reader:
         cache_path: Optional[Union[str, os.PathLike]] = None,
     ):
         r"""
-        A convenience wrapper for :meth:`Reader.recache()` with
+        A convenience wrapper for :meth:`Reader.recache` with
         `force_cache=True`\.
 
         Args:
@@ -132,6 +167,16 @@ class Reader:
             raise RuntimeError(message)
 
     def __getitem__(self, idx):
+        r"""
+        Get item(s) from the target JSONL file.
+
+        Call using slice or index syntax:
+
+        >>> import fast_jsonl as fj
+        >>> reader = fj.Reader("path_to_file.jsonl")
+        >>> reader[0]  # get first line
+        >>> reader[4:8:-1]  # get 7th through 4th lines in reverse order
+        """
         if isinstance(idx, slice):
             return self._slice(idx.start, idx.stop, idx.step)
         return self._getitem(idx)
