@@ -8,13 +8,15 @@ authors = [
 maintainers = [
     {name = "Mathew Huerta-Enochian", email = "mathewhe@gmail.com"},
 ]
-version = "0.1.0"
+version = "0.1.0-alpha"
 requires-python = ">=3.8.0"
 dependencies = [
     "filelock",
 ]
 classifiers = [
     "License :: OSI Approved :: Apache Software License",
+
+    "Operating System :: OS Independent",
 
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
