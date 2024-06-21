@@ -12,9 +12,6 @@ fast_jsonl.cache
 Cache Management
 ----------------
 
-Most cache management functions are intended to be used internally and are not
-inteded for direct use by users.
-
 .. autosummary::
    :toctree: generated
    :nosignatures:

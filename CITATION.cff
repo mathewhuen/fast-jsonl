@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+title: fast-jsonl
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Mathew
+    family-names: Huerta-Enochian
+    email: mathewhe@gmail.com
+    orcid: 'https://orcid.org/0000-0001-7840-8637'
+repository-code: 'https://github.com/mathewhuen/fast-jsonl'
+abstract: For quick indexing and slicing of lines from JSONL files.
+license: Apache-2.0

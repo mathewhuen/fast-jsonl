@@ -15,3 +15,6 @@ Reading JSONL Files
 .. autosummary::
    :toctree: generated
    :nosignatures:
+   :template: classtemplate.rst
+
+   Reader
