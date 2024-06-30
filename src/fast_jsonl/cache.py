@@ -255,6 +255,11 @@ def cache_init(
         :func:`cache_init` is called by :class:`fast_jsonl.reader.Reader` to
         initialize the cache for a file.
     """
+    if not Path(path).exists():
+        message = (
+            f'No file found at specified file path "{path}"!'
+        )
+        raise FileNotFoundError(message)
     if cache_path is None:
         cache_path = filepath_to_cachepath(path)
     else:
