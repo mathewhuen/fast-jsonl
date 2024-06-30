@@ -22,10 +22,15 @@ class TestCache:
             return Path(os.environ["USERPROFILE"])
         raise RuntimeError()
 
+    def _hash(self, text):
+        hashed = hashlib.sha256()
+        hashed.update(text.encode())
+        return hashed.hexdigest()
+
     def _get_expected_cachepath_local(self, path):
         target_dir = path.parent / ".fj_cache"
         target_dir.mkdir(parents=True, exist_ok=True)
-        target_path = target_dir / f"{path.name.replace('.', '-')}.cache.json"
+        target_path = target_dir / path.stem / f"{self._hash(path.name)}.cache.json"
         return target_path
 
     def test_filepath_to_cachepath_local(self, tmp_path):
@@ -37,9 +42,11 @@ class TestCache:
     def _get_expected_cachepath_user(self, path):
         target_dir = self.get_home() / ".local/share/fj_cache"
         target_dir.mkdir(parents=True, exist_ok=True)
+        posix_path = path.as_posix()
         target_path = (
             target_dir
-            / f"{path.as_posix().replace('/', '--').replace('.', '-')}.cache.json"
+            / posix_path.replace("/", "--")
+            / f"{self._hash(posix_path)}.cache.json"
         )
         return target_path
 
@@ -97,7 +104,7 @@ class TestCache:
     def test_get_hash(self, tmp_path):
         path = tmp_path / "data.jsonl"
         data.save_data(path, data.empty_zero)
-        cache_hash = fj.cache.get_hash(path)
+        cache_hash = fj.cache.get_file_hash(path)
         target_hash = hashlib.blake2b()
         with open(path, "rb") as f:
             target_hash.update(f.read())
@@ -120,6 +127,7 @@ class TestCache:
 
         assert meta["hash"] == target_hash.hexdigest()
         assert start <= meta["mtime"] <= end
+        assert meta["path"] == path.resolve().as_posix()
 
     def test_generate_cache_data(self, tmp_path):
         path = tmp_path / "data.jsonl"
@@ -246,7 +254,7 @@ class TestCache:
         assert not fj.cache.cache_hash_valid(file_path=path, cache=cache)
 
     @pytest.mark.parametrize(
-        "cache_path,precache,modify_file,params",
+        "cache_name,precache,modify_file,params",
         list(itertools.product(
             [None, "cache.json"],
             [False, True],
@@ -257,12 +265,16 @@ class TestCache:
     def test_cache_init_params(
         self,
         tmp_path,
-        cache_path,
+        cache_name,
         precache,
         modify_file,
         params,
     ):
         path = tmp_path / "data.jsonl"
+        if cache_name is not None:
+            cache_path = tmp_path / cache_name
+        else:
+            cache_path = None
         data.save_data(path, data.empty_ten)
         if precache:
             fj.cache.make_cache(path, cache_path=cache_path)
@@ -271,3 +283,8 @@ class TestCache:
         if precache and modify_file == "content":
             data.save_data(path, data.various_ten)
         _ = fj.cache.cache_init(path, cache_path=cache_path, **params)
+
+    def test_filenotfounderror_cache_init(self, tmp_path):
+        path = tmp_path / "data.jsonl"
+        with pytest.raises(FileNotFoundError):
+            _ = fj.cache.cache_init(path)

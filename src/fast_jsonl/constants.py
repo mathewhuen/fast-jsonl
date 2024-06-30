@@ -17,7 +17,7 @@ Library-wide constants.
 
 Environment variable constants:
 
-* FAST_JSONL_DIR_METHOD: If set to "user", JSONL cache files will be saved to `<user-home>/.local/share/fj_cache/`\. If set to "local", JSONL cache files will be saved to `<file-directory>/.fj_cache/`\. Defaults to "user".
+* FAST_JSONL_DIR_METHOD: If set to "user", fast-jsonl cache files will be saved to `<user-home>/.local/share/fj_cache/`\. If set to "local", fast-jsonl cache files will be saved to `<jsonl-parent-directory>/.fj_cache/`\. Defaults to "user" if not specified.
 
 """
 

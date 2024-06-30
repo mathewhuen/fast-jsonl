@@ -21,15 +21,65 @@ This means that all concurrent cache calls will wait until the filelock is
 lifted, and if the JSONL file is not changed (which it should not be changed
 during runtime) redundant caching can be avoided.
 
-Note that lockfiles are currently saved at
-`<file-directory>/.locks/<file-name>.lock` where `<file-directory>` is the
-directory containing the target JSONL file and `<file-name>` is the target
-JSONL file name.
+.. note::
+   Lockfiles are currently saved using a similar strategy with that of
+   cache file paths:
+
+   * If the environment variable `FAST_JSONL_DIR_METHOD` is unset
+     or set to "user", lockfiles will be stored at
+     `<home>/.local/share/fj_locks/<modified-path>/<path-hash>.lock` where
+     `<home>` is the user's home directory, `<modified-path>` is the posix path
+     to the target file with all "/" replaced with "--", and `<path-hash>` a
+     sha256 hash of the unmodified file path.
+
+   * If `FAST_JSONL_DIR_METHOD` is set to "local", lockfiles are saved at
+     `<file-directory>/.locks/<file-name>.lock` where `<file-directory>` is the
+     directory containing the target file and `<file-name>` is the unmodified
+     name of the target file.
 """
 
 from pathlib import Path
-
 from filelock import FileLock
+
+import fast_jsonl as fj
+
+
+def get_filelock_path_local(path):
+    r"""
+    Get a filelock path as a subdirectory of on the target file's
+    directory.
+
+    Args:
+        path (str or pathlike): The target file path.
+    """
+    path = Path(path)
+    lockdir = path.parent / ".locks"
+    if not lockdir.exists():
+        lockdir.mkdir(parents=True, exist_ok=True)
+    lock_path = lockdir / path.name
+    lock_path = lock_path.resolve().as_posix() + ".lock"
+    return lock_path
+
+
+def get_filelock_path_user(path):
+    r"""
+    Get a filelock path as a subdirectory of the user's home directory.
+
+    Args:
+        path (str or pathlike): The target file path.
+    """
+    path = Path(path)
+    lockdir = Path.home() / ".local/share/fj_locks"
+    # lockdir = path.parent / ".locks"
+    if not lockdir.exists():
+        lockdir.mkdir(parents=True, exist_ok=True)
+    posix_path = path.resolve().as_posix()
+    modified_path = posix_path.replace("/", "--")
+    locksubdir = lockdir / modified_path
+    if not locksubdir.exists():
+        locksubdir.mkdir(parents=True, exist_ok=True)
+    hashed_name = fj.cache.get_text_hash(posix_path)
+    return locksubdir / f"{hashed_name}.lock"
 
 
 class Lock:
@@ -49,19 +99,21 @@ class Lock:
     @staticmethod
     def get_filelock_path(path):
         r"""
-        Get a filelock path as a subdirectory of on the target file's
-        directory.
+        Get a filelock path.
 
         Args:
             path (str or pathlike): The target file path.
         """
-        path = Path(path)
-        lockdir = path.parent / ".locks"
-        if not lockdir.exists():
-            lockdir.mkdir(exist_ok=True)
-        lock_path = lockdir / path.name
-        lock_path = lock_path.resolve().as_posix() + ".lock"
-        return lock_path
+        if fj.constants.DIR_METHOD == "local":
+            return get_filelock_path_local(path)
+        elif fj.constants.DIR_METHOD == "user":
+            return get_filelock_path_user(path)
+        else:
+            message = (
+                f"Unknown value for {fj.constants.DIR_METHOD_ENV} environment "
+                f'variable: "{fj.constants.DIR_METHOD}".'
+            )
+            raise ValueError(message)
 
     def acquire(self):
         r"""Acquire the lock."""
