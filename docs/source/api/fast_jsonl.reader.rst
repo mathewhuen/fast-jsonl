@@ -18,3 +18,4 @@ Reading JSONL Files
    :template: classtemplate.rst
 
    Reader
+   MultiReader

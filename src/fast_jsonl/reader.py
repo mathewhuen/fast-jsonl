@@ -49,7 +49,7 @@ checks to catch data changes in the future.
 
 import os
 import json
-from typing import Optional, Union
+from typing import List, Optional, Union
 
 import fast_jsonl as fj
 
@@ -83,9 +83,8 @@ class Reader:
         """
         self.path = path
         self.cache_path = cache_path
-        self.cache = fj.cache.cache_init(
-            path,
-            cache_path=cache_path,
+        self.cache = None
+        self.recache(
             force_cache=force_cache,
             check_cache_time=check_cache_time,
             check_cache_hash=check_cache_hash,
@@ -107,7 +106,7 @@ class Reader:
             self.cache_path = cache_path
         self.cache = fj.cache.cache_init(
             self.path,
-            cache_path=cache_path,
+            cache_path=self.cache_path,
             force_cache=force_cache,
             check_cache_time=check_cache_time,
             check_cache_hash=check_cache_hash,
@@ -131,16 +130,12 @@ class Reader:
         return len(self.cache["lines"])
 
     def _slice(self, start, stop, step):
-        # output = list()
-        # for idx in range(start, stop, step):
-        #    output.append(self._getitem(idx))
-        # return output
-        if start is None:
-            start = 0
-        if stop is None:
-            stop = len(self)
         if step is None:
             step = 1
+        if start is None:
+            start = 0 if step > 0 else (len(self) - 1)
+        if stop is None:
+            stop = len(self) if step > 0 else 0
         return [self._getitem(idx) for idx in range(start, stop, step)]
 
     def _getitem(self, idx):
@@ -184,3 +179,94 @@ class Reader:
     def __iter__(self):
         for idx in range(len(self)):
             yield self[idx]
+
+
+class MultiReader(Reader):
+    r"""Class for reading multiple JSONL files."""
+    def __init__(
+        self,
+        path: List[Union[str, os.PathLike]],
+        cache_path: List[Optional[Union[str, os.PathLike]]] = None,
+        force_cache: bool = False,
+        check_cache_time: bool = False,
+        check_cache_hash: bool = False,
+        **kwargs,
+    ):
+        r"""
+        Initialize :class:`MultiReader`\.
+
+        The api for :class:`MultiReader` is the same as that for
+        :class:`Reader`\ and can be used almost identically to read from
+        multiple JSONL as if they were a single file.
+
+        The biggest difference when working with this class is that a list of
+        file paths should be passed when initializing an instance, rather than
+        just a single path when initializing :class:`Reader`\.
+
+        Under the hood, :class:`MultiReader` creates a :class:`Reader` instance
+        for each file path.
+
+        Args:
+            path (list[str or pathlike]):
+            cache_path (list[str or pathlike], optional):
+            force_cache (bool, optional):
+            check_cache_time (bool, optional):
+            check_cache_hash (bool, optional):
+        """
+        if cache_path is None:
+            cache_path = [None for _ in path]
+        self.path = path
+        self.cache_path = cache_path
+        self.readers = None
+        self.readers_info = None
+        self.recache(
+            force_cache=force_cache,
+            check_cache_time=check_cache_time,
+            check_cache_hash=check_cache_hash,
+        )
+
+    def recache(
+        self,
+        cache_path: Optional[Union[str, os.PathLike]] = None,
+        force_cache: bool = False,
+        check_cache_time: bool = False,
+        check_cache_hash: bool = False,
+        **kwargs,
+    ):
+        if cache_path is None:
+            cache_path = self.cache_path
+        else:
+            assert isinstance(cache_path, list) and len(cache_path) == len(self.path)
+            self.cache_path = cache_path
+        self.readers = [
+            Reader(
+                single_path,
+                cache_path=single_cache_path,
+                force_cache=force_cache,
+                check_cache_time=check_cache_time,
+                check_cache_hash=check_cache_hash,
+                **kwargs,
+            )
+            for single_path, single_cache_path in zip(self.path, self.cache_path)
+        ]
+        lengths = [len(reader) for reader in self.readers]
+        self.readers_info = dict()
+        cumulative = {
+            i: sum(lengths[:i+1])
+            for i in range(len(self.readers))
+        }
+        self.readers_info["cumulative_sizes"] = cumulative
+        self.readers_info["instance_reader_map"] = {
+            idx: group
+            for group in range(len(self.readers))
+            for idx in range(cumulative[group-1] if group>0 else 0, cumulative[group])
+        }
+
+    def __len__(self):
+        return sum(len(reader) for reader in self.readers)
+
+    def _getitem(self, idx):
+        reader_index = self.readers_info["instance_reader_map"][idx]
+        floor = self.readers_info["cumulative_sizes"][reader_index-1] if reader_index > 0 else 0
+        sub_index = idx - floor
+        return self.readers[reader_index][sub_index]
