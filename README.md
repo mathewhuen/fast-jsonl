@@ -36,6 +36,14 @@ for line in reader:  # iterate through lines
 print(reader[10:20])  # slice the data
 ```
 
+fast_jsonl can also read from multiple JSONL files:
+```python
+import fast_jsonl as fj
+
+paths = ["path_to_file_0.jsonl", "path_to_file_1.jsonl"]
+reader = fj.MultiReader(paths)
+```
+
 ## Parameters
 
 ### Cache file path
