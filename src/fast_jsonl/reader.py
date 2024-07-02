@@ -71,11 +71,21 @@ class Reader:
         Initialize :class:`Reader`\.
 
         Args:
-            path (str or pathlike):
-            cache_path (str or pathlike, optional):
-            force_cache (bool, optional):
-            check_cache_time (bool, optional):
-            check_cache_hash (bool, optional):
+            path (str or pathlike): Path to JSONL file to parse.
+            cache_path (str or pathlike, optional): Path to JSONL cache file.
+                If None, inferred from `path` argument.
+                Defaults to None.
+            force_cache (bool, optional): If True, generate a new cache file
+                regardless of if one already exists.
+                Defaults to False.
+            check_cache_time (bool, optional): If True, overwrite an existing
+                cache file if the mtime of the target JSONL file specified by
+                `path` is newer than the recorded mtime in the existing cache
+                file.
+            check_cache_hash (bool, optional): If True, overwrite an existing
+                cache file if the hash of the target JSONL file specified by
+                `path` is newer than the recorded hash in the existing cache
+                file.
 
         Note:
             The `force_cache` argument overrides the two cache check arguments:
@@ -214,11 +224,27 @@ class MultiReader(Reader):
         for each file path.
 
         Args:
-            path (list[str or pathlike]):
-            cache_path (list[str or pathlike], optional):
-            force_cache (bool, optional):
-            check_cache_time (bool, optional):
-            check_cache_hash (bool, optional):
+            path (list[str or pathlike]): List of paths to JSONL files.
+            cache_path (list[str or pathlike], optional): Paths to JSONL cache
+                files.
+                If None, inferred from `path` argument.
+                Defaults to None.
+            force_cache (bool, optional): If True, generate a new cache file
+                regardless of if one already exists.
+                Defaults to False.
+            check_cache_time (bool, optional): If True, overwrite an existing
+                cache file if the mtime of the target JSONL file specified by
+                `path` is newer than the recorded mtime in the existing cache
+                file.
+            check_cache_hash (bool, optional): If True, overwrite an existing
+                cache file if the hash of the target JSONL file specified by
+                `path` is newer than the recorded hash in the existing cache
+                file.
+
+        Note:
+            The `force_cache` argument overrides the two cache check arguments:
+            if `force_cache=True` is passed, both `check_cache_time` and
+            `check_cache_hash` will be ignored.
         """
         if cache_path is None:
             cache_path = [None for _ in path]
