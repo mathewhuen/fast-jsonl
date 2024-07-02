@@ -3,9 +3,9 @@
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -189,6 +189,7 @@ class Reader:
 
 class MultiReader(Reader):
     r"""Class for reading multiple JSONL files."""
+
     def __init__(
         self,
         path: List[Union[str, os.PathLike]],
@@ -242,7 +243,8 @@ class MultiReader(Reader):
         if cache_path is None:
             cache_path = self.cache_path
         else:
-            assert isinstance(cache_path, list) and len(cache_path) == len(self.path)
+            assert isinstance(cache_path, list)
+            assert len(cache_path) == len(self.path)
             self.cache_path = cache_path
         self.readers = [
             Reader(
@@ -253,19 +255,24 @@ class MultiReader(Reader):
                 check_cache_hash=check_cache_hash,
                 **kwargs,
             )
-            for single_path, single_cache_path in zip(self.path, self.cache_path)
+            for single_path, single_cache_path in zip(
+                self.path,
+                self.cache_path,
+            )
         ]
         lengths = [len(reader) for reader in self.readers]
         self.readers_info = dict()
         cumulative = {
-            i: sum(lengths[:i+1])
-            for i in range(len(self.readers))
+            i: sum(lengths[: i + 1]) for i in range(len(self.readers))
         }
         self.readers_info["cumulative_sizes"] = cumulative
         self.readers_info["instance_reader_map"] = {
             idx: group
             for group in range(len(self.readers))
-            for idx in range(cumulative[group-1] if group>0 else 0, cumulative[group])
+            for idx in range(
+                cumulative[group - 1] if group > 0 else 0,
+                cumulative[group],
+            )
         }
 
     def __len__(self):
@@ -273,6 +280,9 @@ class MultiReader(Reader):
 
     def _getitem(self, idx):
         reader_index = self.readers_info["instance_reader_map"][idx]
-        floor = self.readers_info["cumulative_sizes"][reader_index-1] if reader_index > 0 else 0
+        if reader_index > 0:
+            floor = self.readers_info["cumulative_sizes"][reader_index - 1]
+        else:
+            floor = 0
         sub_index = idx - floor
         return self.readers[reader_index][sub_index]
