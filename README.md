@@ -104,3 +104,11 @@ If you're working in a production environment, 9 times out of 10 you should
 probably invest in a more scalable format than JSONL.
 However, especially in machine learning and data science, there are a lot of
 use cases for large JSONL files.
+
+## TODO
+
+- Add tests for pre-caching CLI.
+- Add benchmarks code and section to readme.
+- Add multi-threaded caching.
+- Add support for faster JSON backends (ex: orjson)
+- Change slicing to use serial loading to avoid redundant byte seek calls.
