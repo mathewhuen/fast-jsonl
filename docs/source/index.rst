@@ -10,7 +10,6 @@ Welcome to fast-jsonl's documentation!
    :maxdepth: 2
    :caption: Contents:
 
-   guide/main
    api/main
    releases/main
 
