@@ -22,6 +22,7 @@ files.
 
 import os
 import json
+import string
 import hashlib
 from pathlib import Path
 from typing import Optional, Union
@@ -124,12 +125,30 @@ def get_mtime(path):
     return Path(path).stat().st_mtime
 
 
-def get_file_hash(file_path, algorithm=hashlib.blake2b, chunksize=8192):
+def base16_to_base10(value):
+    return int(value, 16)
+
+
+def base10_to_base62(value):
+    base = 62
+    # BASE62 = string.ascii_letters + string.digits
+    BASE62 = string.digits + string.ascii_letters
+    MAP62 = {i: char for i, char in enumerate(BASE62)}
+    output = list()
+    while value >= base:
+        output.append(value % base)
+        value = value // base
+    output.append(value)
+    output = output[::-1]
+    return "".join([MAP62[x] for x in output])
+
+
+def get_file_hash(file_path, algorithm=hashlib.sha256, chunksize=8192):
     with open(file_path, "rb") as f:
         file_hash = algorithm()
         while chunk := f.read(chunksize):
             file_hash.update(chunk)
-    return file_hash.hexdigest()
+    return base10_to_base62(base16_to_base10(file_hash.hexdigest()))
 
 
 def scan_meta(file_path):

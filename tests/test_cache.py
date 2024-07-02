@@ -101,14 +101,45 @@ class TestCache:
         mtime = fj.cache.get_mtime(path)
         assert start <= mtime <= end
 
+    @pytest.mark.parametrize(
+        "base16,base10",
+        [
+            ("10", 16),
+            ("100", 256),
+            ("1_000", 4_096),
+            ("10_000", 65_536),
+            ("100_000", 1_048_576),
+        ]
+    )
+    def test_base16_to_base10(self, base16, base10):
+        target_base10 = fj.cache.base16_to_base10(base16)
+        assert target_base10 == base10
+
+    @pytest.mark.parametrize(
+        "base10,base62",
+        [
+            (10, "a"),
+            (100, "1C"),
+            (1_000, "g8"),
+            (10_000, "2Bi"),
+            (100_000, "q0U"),
+        ]
+    )
+    def test_base10_to_base62(self, base10, base62):
+        target_base62 = fj.cache.base10_to_base62(base10)
+        assert target_base62 == base62
+
     def test_get_hash(self, tmp_path):
         path = tmp_path / "data.jsonl"
         data.save_data(path, data.empty_zero)
         cache_hash = fj.cache.get_file_hash(path)
-        target_hash = hashlib.blake2b()
+        target_hash = hashlib.sha256()
         with open(path, "rb") as f:
             target_hash.update(f.read())
-        assert cache_hash == target_hash.hexdigest()
+        target_hash = fj.cache.base10_to_base62(fj.cache.base16_to_base10(
+            target_hash.hexdigest()
+        ))
+        assert cache_hash == target_hash
 
     def test_scan_meta(self, tmp_path):
         path = tmp_path / "data.jsonl"
@@ -121,11 +152,14 @@ class TestCache:
 
         meta = fj.cache.scan_meta(path)
 
-        target_hash = hashlib.blake2b()
+        target_hash = hashlib.sha256()
         with open(path, "rb") as f:
             target_hash.update(f.read())
+        target_hash = fj.cache.base10_to_base62(fj.cache.base16_to_base10(
+            target_hash.hexdigest()
+        ))
 
-        assert meta["hash"] == target_hash.hexdigest()
+        assert meta["hash"] == target_hash
         assert start <= meta["mtime"] <= end
         assert meta["path"] == path.resolve().as_posix()
 
@@ -177,9 +211,12 @@ class TestCache:
             int(k): v for k, v in cache_loaded["lines"].items()
         }
 
-        target_hash = hashlib.blake2b()
+        target_hash = hashlib.sha256()
         with open(path, "rb") as f:
             target_hash.update(f.read())
+        target_hash = fj.cache.base10_to_base62(fj.cache.base16_to_base10(
+            target_hash.hexdigest()
+        ))
 
         assert cache == cache_loaded
         self._assert_cache_lines(
@@ -188,7 +225,7 @@ class TestCache:
             target_data=target_data,
         )
         assert start <= cache["meta"]["mtime"] <= end
-        assert cache["meta"]["hash"] == target_hash.hexdigest()
+        assert cache["meta"]["hash"] == target_hash
 
     @pytest.mark.parametrize(
         "target_data",
