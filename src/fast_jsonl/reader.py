@@ -49,6 +49,7 @@ checks to catch data changes in the future.
 
 import os
 import json
+from collections.abc import Iterable
 from typing import List, Optional, Union
 
 import fast_jsonl as fj
@@ -161,6 +162,9 @@ class Reader:
             )
             raise RuntimeError(message)
 
+    def _getitems(self, ids):
+        return [self._getitem(idx) for idx in ids]
+
     def __getitem__(self, idx):
         r"""
         Get item(s) from the target JSONL file.
@@ -174,6 +178,8 @@ class Reader:
         """
         if isinstance(idx, slice):
             return self._slice(idx.start, idx.stop, idx.step)
+        elif isinstance(idx, Iterable):
+            return self._getitems(idx)
         return self._getitem(idx)
 
     def __iter__(self):

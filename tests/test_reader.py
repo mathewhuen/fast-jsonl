@@ -1,12 +1,13 @@
 import os
 import time
+import copy
+import types
 import pytest
 import itertools
 from pathlib import Path
 from abc import abstractmethod
 
 import fast_jsonl as fj
-
 
 import data
 
@@ -26,6 +27,12 @@ class BaseTests:
     @abstractmethod
     def make_cache(self, path, cache_path):
         pass
+
+    def copy_inds(self, inds, n=2):
+        if isinstance(inds, types.GeneratorType):
+            inds = list(inds)
+            return [(i for i in inds) for _ in range(n)]
+        return [copy.deepcopy(inds) for _ in range(n)]
 
     def test_init(self, tmp_path):
         path = self.get_path_info(tmp_path)
@@ -88,6 +95,22 @@ class BaseTests:
         self.save_data(path, instances)
         reader = self.reader(path)
         assert all([instances[i] == reader[i] for i in range(len(instances))])
+
+    @pytest.mark.parametrize(
+        "instances,inds",
+        [
+            (data.empty_ten, [0, 2, 4]),
+            (data.various_ten, [0, 2, 4]),
+            (data.various_ten, (i for i in range(3))),
+            (data.various_ten, (i for i in range(2, 6, 2))),
+        ],
+    )
+    def test_multi_index_getitem(self, tmp_path, instances, inds):
+        path = self.get_path_info(tmp_path)
+        self.save_data(path, instances)
+        reader = self.reader(path)
+        inds_0, inds_1 = self.copy_inds(inds, n=2)  # copy in case of generator
+        assert [instances[idx] for idx in inds_0] == reader[inds_1]
 
     @pytest.mark.parametrize(
         "instances,start,stop,step",
