@@ -33,7 +33,7 @@ import fast_jsonl as fj
 def get_text_hash(text, algorithm=hashlib.sha256):
     file_hash = algorithm()
     file_hash.update(text.encode())
-    return file_hash.hexdigest()
+    return base10_to_base62(base16_to_base10(file_hash.hexdigest()))
 
 
 def filepath_to_cachepath_local(file_path):
@@ -131,7 +131,6 @@ def base16_to_base10(value):
 
 def base10_to_base62(value):
     base = 62
-    # BASE62 = string.ascii_letters + string.digits
     BASE62 = string.digits + string.ascii_letters
     MAP62 = {i: char for i, char in enumerate(BASE62)}
     output = list()

@@ -25,7 +25,9 @@ class TestCache:
     def _hash(self, text):
         hashed = hashlib.sha256()
         hashed.update(text.encode())
-        return hashed.hexdigest()
+        return fj.cache.base10_to_base62(fj.cache.base16_to_base10(
+            hashed.hexdigest()
+        ))
 
     def _get_expected_cachepath_local(self, path):
         target_dir = path.parent / ".fj_cache"
@@ -129,7 +131,18 @@ class TestCache:
         target_base62 = fj.cache.base10_to_base62(base10)
         assert target_base62 == base62
 
-    def test_get_hash(self, tmp_path):
+    @pytest.mark.parametrize(
+        "text,target_hash",
+        [
+            ("asdf", "V7DVVF8qmVPMktNhAOHeHqXzILiaAMHl6GvmTk1DlZ9"),
+            ("test.jsonl", "dqanDTA2zYeGdN2Xxx3NZczRP9NmOf4UrI53aRWSdt6"),
+        ],
+    )
+    def test_get_text_hash(self, text, target_hash):
+        hashed = fj.cache.get_text_hash(text)
+        assert hashed == target_hash
+
+    def test_get_file_hash(self, tmp_path):
         path = tmp_path / "data.jsonl"
         data.save_data(path, data.empty_zero)
         cache_hash = fj.cache.get_file_hash(path)
