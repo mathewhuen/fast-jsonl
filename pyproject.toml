@@ -43,6 +43,9 @@ dev = [
 repository = "https://github.com/mathewhuen/fast-jsonl"
 changelog = "https://github.com/mathewhuen/fast-jsonl/blob/main/CHANGELOG.md"
 
+[project.scripts]
+fj_precache = "fast_jsonl.cli:precache"
+
 [build-system]
 requires = ["setuptools >= 61.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
