@@ -1,4 +1,58 @@
 Version 0.1.0
 =============
 
-*2024-06-22*
+*2024-07-08*
+
+Welcome to the initial release of the fast-jsonl library!
+
+What is fast-jsonl?
+
+It's a small library for quickly reading JSONL data files.
+It works by storing the byte position of each line in the JSONL file to a
+disk-based cache and then loading only specific lines into memory when needed.
+This works great for machine learning and data science workflows that rely on
+(usually semi-)random access to huge datasets that may be too large to fit
+into memory.
+
+Getting Started
+---------------
+
+Install with pip:
+
+.. code-block:: shell
+
+   pip install fast-jsonl
+
+And simply pass the path to your JSONL file to the fast-jsonl Reader class and
+index or slice the reader as if it is a data array:
+
+.. code-block:: python
+
+   import fast_jsonl as fj
+
+   data = fj.Reader("path-to-file.jsonl")
+
+   # get any instance by index
+   instance = data[0]
+
+   # get slices of data
+   instances = data[:10]
+   instances_rev = data[:10:-1]
+
+Multiple JSONL files can be combined into a single dataset using the
+MultiReader class:
+
+.. code-block:: python
+
+   import fast_jsonl as fj
+
+   data = fj.MultiReader(["path-to-file1.jsonl", "path-to-file2.jsonl"])
+
+If your JSONL file has changed on disk, re-initialize the reader with
+`force_cache=True` to force generation of a new cache:
+
+.. code-block:: python
+
+   import fast_jsonl as fj
+
+   data = fj.Reader("path-to-file.jsonl", force_cache=True)
