@@ -1,12 +1,28 @@
+# Copyright 2024 Mathew Huerta-Enochian
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 r"""
 Modules for working with the JSONL cache file.
 
-These files are not intended for users to call directly. Instead, users should
-initialize a :class:`fast_jsonl.Reader` class to work with files.
+These functions are not intended for users to call directly. Instead, users
+should initialize a :class:`fast_jsonl.reader.Reader` instance to work with
+files.
 """
 
 import os
 import json
+import string
 import hashlib
 from pathlib import Path
 from typing import Optional, Union
@@ -14,16 +30,22 @@ from typing import Optional, Union
 import fast_jsonl as fj
 
 
+def get_text_hash(text, algorithm=hashlib.sha256):
+    file_hash = algorithm()
+    file_hash.update(text.encode())
+    return base10_to_base62(base16_to_base10(file_hash.hexdigest()))
+
+
 def filepath_to_cachepath_local(file_path):
     r"""
     Get a cache file path based on the location of the given file path.
     """
     path = Path(file_path)
-    # assert path.exists()
     cache_dir = path.parent / ".fj_cache"
-    if not cache_dir.exists():
-        cache_dir.mkdir(parents=True)
-    return cache_dir / f"{path.name.replace('.', '-')}.cache.json"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    collision_dir = cache_dir / path.stem
+    collision_dir.mkdir(exist_ok=True)
+    return collision_dir / f"{get_text_hash(path.name)}.cache.json"
 
 
 def filepath_to_cachepath_user(file_path):
@@ -32,10 +54,13 @@ def filepath_to_cachepath_user(file_path):
     """
     path = Path(file_path)
     cache_dir = Path.home() / ".local/share/fj_cache"
-    if not cache_dir.exists():
-        cache_dir.mkdir(parents=True)
-    name = path.resolve().as_posix().replace(".", "-").replace("/", "--")
-    return cache_dir / f"{name}.cache.json"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    posix_path = path.resolve().as_posix()
+    name = posix_path.replace("/", "--")
+    collision_dir = cache_dir / name
+    collision_dir.mkdir(exist_ok=True)
+    hashed_name = get_text_hash(posix_path)
+    return collision_dir / f"{hashed_name}.cache.json"
 
 
 def filepath_to_cachepath(file_path):
@@ -43,11 +68,20 @@ def filepath_to_cachepath(file_path):
     Get an inferred cache path for a given file path.
 
     The inferred cache path can be controlled using an environment variable.
-    If FAST_JSONL_DIR_METHOD is set to "local", the cache path will be in a
-    subdirectory in the target file path's directory. If it is set to "user",
-    the cache path will be in <home>/.local/share/fj_cache/ where <home> is the
-    user's home directory.
 
+    If `FAST_JSONL_DIR_METHOD` is set to "local", the cache path will be in a
+    subdirectory in the target file path's directory.
+
+    If it is set to "user", the cache path will be in
+    `<home>/.local/share/fj_cache/<modified-file-path>/<file-path-hash>.json`
+    where `<home>` is the user's home directory, `<modified-file-path>` is the
+    posix path to the target file with all "/" replaced with "--", and
+    `<file-path-hash>` is the sha256 hash of the unmodified posix path to the
+    target file.
+
+    Using both the modified file name and the hash prevents cache collisions
+    (from the "/" -> "--" modification) while still being (mostly) human
+    readible.
 
     Args:
         file_path (str or pathlike): The path to the target JSONL file.
@@ -61,7 +95,7 @@ def filepath_to_cachepath(file_path):
             f"Unknown value for {fj.constants.DIR_METHOD_ENV} environment "
             f'variable: "{fj.constants.DIR_METHOD}".'
         )
-        raise NotImplementedError(message)
+        raise ValueError(message)
 
 
 def scan_lines(file_path):
@@ -91,29 +125,42 @@ def get_mtime(path):
     return Path(path).stat().st_mtime
 
 
-def get_hash(file_path, algorithm=hashlib.blake2b, chunksize=8192):
+def base16_to_base10(value):
+    return int(value, 16)
+
+
+def base10_to_base62(value):
+    base = 62
+    BASE62 = string.digits + string.ascii_letters
+    MAP62 = {i: char for i, char in enumerate(BASE62)}
+    output = list()
+    while value >= base:
+        output.append(value % base)
+        value = value // base
+    output.append(value)
+    output = output[::-1]
+    return "".join([MAP62[x] for x in output])
+
+
+def get_file_hash(file_path, algorithm=hashlib.sha256, chunksize=8192):
     with open(file_path, "rb") as f:
         file_hash = algorithm()
         while chunk := f.read(chunksize):
             file_hash.update(chunk)
-    return file_hash.hexdigest()
+    return base10_to_base62(base16_to_base10(file_hash.hexdigest()))
 
 
 def scan_meta(file_path):
+    if isinstance(file_path, str):
+        file_path = Path(file_path)
     return {
+        "path": file_path.resolve().as_posix(),
         "mtime": get_mtime(file_path),
-        "hash": get_hash(file_path),
+        "hash": get_file_hash(file_path),
     }
 
 
 def generate_cache_data(file_path):
-    # linedata = scan_lines(file_path)
-    # metadata = scan_meta(file_path)
-    # cache = {
-    #    "meta": metadata,
-    #    "lines": linedata,
-    # }
-    # return cache
     return {
         "meta": scan_meta(file_path),
         "lines": scan_lines(file_path),
@@ -181,7 +228,7 @@ def cache_hash_valid(file_path, cache):
         cache (dict): The loaded cache.
     """
     cached_hash = cache["meta"]["hash"]
-    file_hash = get_hash(file_path)
+    file_hash = get_file_hash(file_path)
     return cached_hash == file_hash
 
 
@@ -226,6 +273,9 @@ def cache_init(
         :func:`cache_init` is called by :class:`fast_jsonl.reader.Reader` to
         initialize the cache for a file.
     """
+    if not Path(path).exists():
+        message = f'No file found at specified file path "{path}"!'
+        raise FileNotFoundError(message)
     if cache_path is None:
         cache_path = filepath_to_cachepath(path)
     else:
@@ -235,7 +285,7 @@ def cache_init(
         )
         assert Path(cache_path).resolve() != Path(path).resolve(), message
 
-    lock = fj.lock.Lock(cache_path)
+    lock = fj.lock.Lock(cache_path)  # better to lock the shorter `path` file?
     lock.acquire()
 
     if force_cache:

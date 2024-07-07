@@ -1,9 +1,33 @@
-# Fast-JSONL
+# fast-jsonl
 
 A very simple library for reading large JSONL files.
 
-This library relies on a line-bit cache that must be calculated once per a
-file.
+This library uses a line-byte cache that must be calculated once per a file and
+can be used across threads and runtimes until the JSONL file is changed.
+
+## Why?
+
+fast-jsonl is intended for data science and machine learning workflows that use
+large JSONL files that cannot be practically loaded into memory (especially
+when using multiprocessing).
+
+In most JSONL reading scenarios, fast-jsonl should work well. Some examples of
+use-cases for fast-jsonl:
+- Random access to one or multiple JSONL files (e.g., PyTorch DataLoaders),
+- Slices of or index-based access to one or multiple JSONL files (e.g.,
+  exploratory data analysis), or
+- Combining multiple data files into a single data object.
+
+When to not use fast-jsonl for reading?
+- If your workflow uses only a single small JSONL file, then just loading the
+  data into memory and using directly should be sufficient.
+- If your workflow uses a single large JSONL file, and you will only read data
+  sequentially starting from the first line, we recommend using the
+  [jsonlines](https://github.com/wbolster/jsonlines) or
+  [orjsonl](https://github.com/umarbutler/orjsonl) libraries.
+- If you are working in a production environment and data files are often
+  modified. In this scenario, it would probably be better to invest in a
+  traditional database.
 
 ## Quickstart
 
@@ -13,7 +37,7 @@ file.
 pip install fast-jsonl
 ```
 
-### Using JSONL
+### Using fast-jsonl
 
 ```python
 import fast_jsonl as fj
@@ -29,13 +53,35 @@ for line in reader:  # iterate through lines
 print(reader[10:20])  # slice the data
 ```
 
+fast_jsonl can also read from multiple JSONL files:
+```python
+import fast_jsonl as fj
+
+paths = ["path_to_file_0.jsonl", "path_to_file_1.jsonl"]
+reader = fj.MultiReader(paths)
+```
+
+If the target JSONL file has changed, make sure to generate a new cache file by
+passing `force_cache=True`:
+```python
+import fast_jsonl as fj
+
+reader = fj.Reader("<path-to-changed-file.jsonl>", force_cache=True)
+```
+
 ## Parameters
 
 ### Cache file path
+
 By default, a cache is stored the first time `Reader` is ever called on a
-specific file and saved at `<parent>/.fj_cache/<modified-name>.cache.json`
-where `<parent>` is the parent directory of the target file and
-`<modified-name>` is a modified version of the target filename.
+specific file and saved at
+`<user-home>/.local/share/fj_cache/<modified-name>/<hash>.cache.json`
+where `<usser-home>` is the user's home directory, `<modified-name>` is the
+target file's path with all directory separators replaced with "--", and
+`<hash>` is a hash of the target file.
+Hashes are used to allow semi-readable cache names (via the modified name)
+while avoiding potential collisions introduced by replacing the path separator
+with "--".
 
 A path for the cache file can be specified by passing `cache_path` to the
 reader:
@@ -47,8 +93,8 @@ path = "path_to_file.jsonl"
 reader = fj.Reader(path, cache_path="path-to-cache")
 ```
 
-Fast-JSONL will always use the extension `.cache.json` for default paths, but
-you are free to specify any extension.
+fast-jsonl uses the extension `.cache.json` for default paths when the cache
+path is not given, but you are free to specify any extension.
 
 ### Re-generating a cache
 
@@ -72,20 +118,23 @@ However, you can override this behavior in one of several ways.
     during initial caching. Different hashes will trigger a re-cache.
 
 Caches can also be re-generated after reader initialization:
+
 ```python
 reader.recache()
 ```
+
 By default, the reader will then re-generate a cache file given the paths
 passed during reader initialization.
 If you want to save the new cache in a new location, simply pass a `cache_path`
 argument to `reader.recache()`.
 
-## Comments about JSONL
+## TODO
 
-If you're working with *large* JSONL files that are either too large to fit in
-memory (and you need to index or call specific lines from), this library should help.
-
-If you're working in a production environment, 9 times out of 10 you should
-probably invest in a more scalable format than JSONL.
-However, especially in machine learning and data science, there are a lot of
-use cases for large JSONL files.
+- Add tests for pre-caching CLI.
+- Add benchmarks code and section to readme.
+- Add multi-threaded caching.
+- Add support for faster JSON backends (ex: orjson)
+- Change slicing to use serial loading to avoid redundant byte seek calls.
+- Allow multi-threaded slicing for faster slice loading.
+- Change slicing to cutoff at 0 and len(reader)-1 so that out of bounds slices
+  behave like builtin lists.

@@ -22,10 +22,17 @@ class TestCache:
             return Path(os.environ["USERPROFILE"])
         raise RuntimeError()
 
+    def _hash(self, text):
+        hashed = hashlib.sha256()
+        hashed.update(text.encode())
+        return fj.cache.base10_to_base62(fj.cache.base16_to_base10(
+            hashed.hexdigest()
+        ))
+
     def _get_expected_cachepath_local(self, path):
         target_dir = path.parent / ".fj_cache"
         target_dir.mkdir(parents=True, exist_ok=True)
-        target_path = target_dir / f"{path.name.replace('.', '-')}.cache.json"
+        target_path = target_dir / path.stem / f"{self._hash(path.name)}.cache.json"
         return target_path
 
     def test_filepath_to_cachepath_local(self, tmp_path):
@@ -37,9 +44,11 @@ class TestCache:
     def _get_expected_cachepath_user(self, path):
         target_dir = self.get_home() / ".local/share/fj_cache"
         target_dir.mkdir(parents=True, exist_ok=True)
+        posix_path = path.as_posix()
         target_path = (
             target_dir
-            / f"{path.as_posix().replace('/', '--').replace('.', '-')}.cache.json"
+            / posix_path.replace("/", "--")
+            / f"{self._hash(posix_path)}.cache.json"
         )
         return target_path
 
@@ -94,14 +103,56 @@ class TestCache:
         mtime = fj.cache.get_mtime(path)
         assert start <= mtime <= end
 
-    def test_get_hash(self, tmp_path):
+    @pytest.mark.parametrize(
+        "base16,base10",
+        [
+            ("10", 16),
+            ("100", 256),
+            ("1_000", 4_096),
+            ("10_000", 65_536),
+            ("100_000", 1_048_576),
+        ]
+    )
+    def test_base16_to_base10(self, base16, base10):
+        target_base10 = fj.cache.base16_to_base10(base16)
+        assert target_base10 == base10
+
+    @pytest.mark.parametrize(
+        "base10,base62",
+        [
+            (10, "a"),
+            (100, "1C"),
+            (1_000, "g8"),
+            (10_000, "2Bi"),
+            (100_000, "q0U"),
+        ]
+    )
+    def test_base10_to_base62(self, base10, base62):
+        target_base62 = fj.cache.base10_to_base62(base10)
+        assert target_base62 == base62
+
+    @pytest.mark.parametrize(
+        "text,target_hash",
+        [
+            ("asdf", "V7DVVF8qmVPMktNhAOHeHqXzILiaAMHl6GvmTk1DlZ9"),
+            ("test.jsonl", "dqanDTA2zYeGdN2Xxx3NZczRP9NmOf4UrI53aRWSdt6"),
+        ],
+    )
+    def test_get_text_hash(self, text, target_hash):
+        hashed = fj.cache.get_text_hash(text)
+        assert hashed == target_hash
+
+    def test_get_file_hash(self, tmp_path):
         path = tmp_path / "data.jsonl"
         data.save_data(path, data.empty_zero)
-        cache_hash = fj.cache.get_hash(path)
-        target_hash = hashlib.blake2b()
+        cache_hash = fj.cache.get_file_hash(path)
+        target_hash = hashlib.sha256()
         with open(path, "rb") as f:
             target_hash.update(f.read())
-        assert cache_hash == target_hash.hexdigest()
+        target_hash = fj.cache.base10_to_base62(fj.cache.base16_to_base10(
+            target_hash.hexdigest()
+        ))
+        assert cache_hash == target_hash
 
     def test_scan_meta(self, tmp_path):
         path = tmp_path / "data.jsonl"
@@ -114,12 +165,16 @@ class TestCache:
 
         meta = fj.cache.scan_meta(path)
 
-        target_hash = hashlib.blake2b()
+        target_hash = hashlib.sha256()
         with open(path, "rb") as f:
             target_hash.update(f.read())
+        target_hash = fj.cache.base10_to_base62(fj.cache.base16_to_base10(
+            target_hash.hexdigest()
+        ))
 
-        assert meta["hash"] == target_hash.hexdigest()
+        assert meta["hash"] == target_hash
         assert start <= meta["mtime"] <= end
+        assert meta["path"] == path.resolve().as_posix()
 
     def test_generate_cache_data(self, tmp_path):
         path = tmp_path / "data.jsonl"
@@ -169,9 +224,12 @@ class TestCache:
             int(k): v for k, v in cache_loaded["lines"].items()
         }
 
-        target_hash = hashlib.blake2b()
+        target_hash = hashlib.sha256()
         with open(path, "rb") as f:
             target_hash.update(f.read())
+        target_hash = fj.cache.base10_to_base62(fj.cache.base16_to_base10(
+            target_hash.hexdigest()
+        ))
 
         assert cache == cache_loaded
         self._assert_cache_lines(
@@ -180,7 +238,7 @@ class TestCache:
             target_data=target_data,
         )
         assert start <= cache["meta"]["mtime"] <= end
-        assert cache["meta"]["hash"] == target_hash.hexdigest()
+        assert cache["meta"]["hash"] == target_hash
 
     @pytest.mark.parametrize(
         "target_data",
@@ -246,7 +304,7 @@ class TestCache:
         assert not fj.cache.cache_hash_valid(file_path=path, cache=cache)
 
     @pytest.mark.parametrize(
-        "cache_path,precache,modify_file,params",
+        "cache_name,precache,modify_file,params",
         list(itertools.product(
             [None, "cache.json"],
             [False, True],
@@ -257,12 +315,16 @@ class TestCache:
     def test_cache_init_params(
         self,
         tmp_path,
-        cache_path,
+        cache_name,
         precache,
         modify_file,
         params,
     ):
         path = tmp_path / "data.jsonl"
+        if cache_name is not None:
+            cache_path = tmp_path / cache_name
+        else:
+            cache_path = None
         data.save_data(path, data.empty_ten)
         if precache:
             fj.cache.make_cache(path, cache_path=cache_path)
@@ -271,3 +333,8 @@ class TestCache:
         if precache and modify_file == "content":
             data.save_data(path, data.various_ten)
         _ = fj.cache.cache_init(path, cache_path=cache_path, **params)
+
+    def test_filenotfounderror_cache_init(self, tmp_path):
+        path = tmp_path / "data.jsonl"
+        with pytest.raises(FileNotFoundError):
+            _ = fj.cache.cache_init(path)
