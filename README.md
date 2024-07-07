@@ -37,7 +37,7 @@ When to not use fast-jsonl for reading?
 pip install fast-jsonl
 ```
 
-### Using JSONL
+### Using fast-jsonl
 
 ```python
 import fast_jsonl as fj
