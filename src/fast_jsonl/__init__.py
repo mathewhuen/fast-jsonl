@@ -18,4 +18,4 @@ import fast_jsonl.lock as lock
 from fast_jsonl.reader import Reader, MultiReader
 
 
-__version__ = "0.1.0-alpha"
+__version__ = "0.1.0"
